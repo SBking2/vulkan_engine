@@ -1,0 +1,4 @@
+.vs
+*.sln
+x64
+ee_vulkan/vendor
