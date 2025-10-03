@@ -8,10 +8,8 @@ namespace ev
 	class Application
 	{
 	public:
-		void init(uint32_t width, uint32_t height);
+		void init();
 		void run();
 		void clear();
-	private:
-		GLFWwindow* m_window;
 	};
 }

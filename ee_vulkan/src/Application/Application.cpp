@@ -1,25 +1,20 @@
 ﻿#include "Application.h"
 #include "Vulkan/VulkanContext.h"
-
+#include "Window/Window.h"
 namespace ev
 {
-	void Application::init(uint32_t width, uint32_t height)
+
+	void Application::init()
 	{
-		//GLFW窗口初始化
-		glfwInit();
-
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);	//阻止自动创建OpenGL上下文
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);		//禁止窗口可变化
-		m_window = glfwCreateWindow(width, height, "EE_Vulkan", nullptr, nullptr);
-
-		VulkanContext::get_instace()->init(width, height, m_window);
+		Window::get_instace()->init(800, 600, "vulkan_example");
+		VulkanContext::get_instace()->init(Window::get_instace()->get_window());
 	}
 
 	void Application::run()
 	{
-		while (!glfwWindowShouldClose(m_window))
+		while (!Window::get_instace()->should_close())
 		{
-			glfwPollEvents();
+			Window::get_instace()->handle_event();
 			VulkanContext::get_instace()->draw_frame();
 		}
 	}
@@ -27,9 +22,6 @@ namespace ev
 	void Application::clear()
 	{
 		VulkanContext::get_instace()->clear();
-
-		//清理GLFW
-		glfwDestroyWindow(m_window);
-		glfwTerminate();
+		Window::get_instace()->clear();
 	}
 }

@@ -20,14 +20,13 @@ namespace ev
 		return VK_FALSE;
 	}
 
-	void VulkanContext::init(uint32_t width, uint32_t height, GLFWwindow* window)
+	void VulkanContext::init(GLFWwindow* window)
 	{
-		m_width = width;
-		m_height = height;
+		m_window = window;
 
 		create_instance();
 		create_debug();
-		create_surface(window);
+		create_surface(m_window);
 		pick_physical_device();
 		create_logical_device();
 		create_swapchain();
@@ -89,14 +88,23 @@ namespace ev
 	void VulkanContext::draw_frame()
 	{
 		//等待fence变为signaled
-		vkWaitForFences(m_logical_device, 1, &m_inflight_fence, VK_TRUE
-			, std::numeric_limits<uint64_t>::max());
-		vkResetFences(m_logical_device, 1, &m_inflight_fence);	//将fence变为unsignaled
+		//vkWaitForFences(m_logical_device, 1, &m_inflight_fence, VK_TRUE
+		//	, std::numeric_limits<uint64_t>::max());
+		//vkResetFences(m_logical_device, 1, &m_inflight_fence);	//将fence变为unsignaled
 
 		//从交换链获取一张图像
 		uint32_t img_index;
-		vkAcquireNextImageKHR(m_logical_device, m_swapchain, std::numeric_limits<uint64_t>::max(),
+		auto result = vkAcquireNextImageKHR(m_logical_device, m_swapchain, std::numeric_limits<uint64_t>::max(),
 			m_img_avaliable_semaphore, VK_NULL_HANDLE, &img_index);
+
+		//当KHR无法使用或者不匹配的时候直接重建交换链，并退出当前的绘制
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_is_wanna_recreate_swapchain)
+		{
+			m_is_wanna_recreate_swapchain = false;
+			printf("recreate_swapchain!\n");
+			recreate_swapchain();
+			return;
+		}
 
 		//执行指令
 		VkSubmitInfo submit_info = {};
@@ -119,7 +127,7 @@ namespace ev
 		submit_info.pSignalSemaphores = signalSemaphores;
 
 		//调用指令需要一个fence,要求fence是unsignaled状态
-		if (vkQueueSubmit(m_graphic_queue, 1, &submit_info, m_inflight_fence) != VK_SUCCESS)
+		if (vkQueueSubmit(m_graphic_queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS)
 		{
 			throw std::runtime_error("failed to queue submit!");
 		}
@@ -137,6 +145,50 @@ namespace ev
 
 		vkQueuePresentKHR(m_present_queue, &present_info);
 		vkQueueWaitIdle(m_present_queue);
+	}
+
+	void VulkanContext::recreate_swapchain()
+	{
+		int width = 0, height = 0;
+
+		//最小化窗口时，不冲击swapchain
+		while (width == 0 || height == 0)
+		{
+			glfwGetFramebufferSize(m_window, &width, &height);
+			glfwWaitEvents();
+		}
+
+		vkDeviceWaitIdle(m_logical_device);		//等待执行结束
+
+		vkDestroySemaphore(m_logical_device, m_img_avaliable_semaphore, nullptr);
+		vkDestroySemaphore(m_logical_device, m_render_finish_semaphore, nullptr);
+		vkDestroyFence(m_logical_device, m_inflight_fence, nullptr);
+
+		for (size_t i = 0; i < m_swapchain_framebuffers.size(); i++)
+		{
+			vkDestroyFramebuffer(m_logical_device, m_swapchain_framebuffers[i], nullptr);
+		}
+		vkFreeCommandBuffers(m_logical_device, m_command_pool, static_cast<uint32_t>(m_command_buffers.size())
+			, m_command_buffers.data());
+
+		vkDestroyPipeline(m_logical_device, m_graphic_pipeline, nullptr);
+		vkDestroyPipelineLayout(m_logical_device, m_pipeline_layout, nullptr);
+		vkDestroyRenderPass(m_logical_device, m_renderpass, nullptr);
+
+		for (size_t i = 0; i < m_swapchain_imgviews.size(); i++)
+		{
+			vkDestroyImageView(m_logical_device, m_swapchain_imgviews[i], nullptr);
+		}
+
+		vkDestroySwapchainKHR(m_logical_device, m_swapchain, nullptr);
+
+		create_swapchain();
+		create_img_views();
+		create_renderpass();
+		create_graphic_piple();
+		create_framebuffer();
+		create_command_buffer();
+		create_semaphore();
 	}
 
 	#pragma region step
@@ -458,7 +510,10 @@ namespace ev
 			}
 			else
 			{
-				choose_extent = { m_width, m_height };
+				int width, height;
+				glfwGetFramebufferSize(m_window, &width, &height);
+
+				choose_extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 				choose_extent.width = std::max(m_physical_device.capabilities.minImageExtent.width
 					, std::min(m_physical_device.capabilities.maxImageExtent.width, choose_extent.width));
 

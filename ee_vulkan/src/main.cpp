@@ -6,7 +6,7 @@
 int main()
 {
 	ev::Application* app = new ev::Application();
-	app->init(800, 600);
+	app->init();
 
 	try
 	{

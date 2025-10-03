@@ -142,11 +142,13 @@
     <ClCompile Include="src\Application\Application.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Vulkan\VulkanContext.cpp" />
+    <ClCompile Include="src\Window\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application\Application.h" />
     <ClInclude Include="src\Singleton\Singleton.h" />
     <ClInclude Include="src\Vulkan\VulkanContext.h" />
+    <ClInclude Include="src\Window\Window.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Shader\GLSL\triangle.frag" />

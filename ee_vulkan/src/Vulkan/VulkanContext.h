@@ -13,9 +13,10 @@ namespace ev
 	class VulkanContext : public Singleton<VulkanContext>
 	{
 	public:
-		void init(uint32_t width, uint32_t height, GLFWwindow* window);
+		void init(GLFWwindow* window);
 		void draw_frame();
 		void clear();
+		void wanna_recreate_swapchain() { m_is_wanna_recreate_swapchain = true; }
 	private:
 		void create_instance();
 		void create_debug();
@@ -31,6 +32,8 @@ namespace ev
 		void create_command_buffer();
 		void create_semaphore();
 	private:
+		void recreate_swapchain();
+	private:
 		bool check_device(VkPhysicalDevice device, int* score
 			, int* graphic_queue_index, int* present_queue_index
 			, VkSurfaceCapabilitiesKHR& capabilities
@@ -39,7 +42,8 @@ namespace ev
 		void read_shader(const std::string& path, std::vector<char>& source);
 		VkShaderModule create_shader_module(const std::vector<char>& source);
 	private:
-		uint32_t m_width, m_height;
+		GLFWwindow* m_window;
+		bool m_is_wanna_recreate_swapchain;
 
 		struct PhysicalDevice
 		{
