@@ -4,7 +4,8 @@ namespace ev
 {
 	static void framebuffer_resize_callback(GLFWwindow* window, int width, int height)
 	{
-		printf("Hello Resize : %d %d \n", width, height);
+		int width2, height2;
+		glfwGetFramebufferSize(window, &width2, &height2);
 		VulkanContext::get_instace()->wanna_recreate_swapchain();
 	}
 

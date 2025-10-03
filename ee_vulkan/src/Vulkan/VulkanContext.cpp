@@ -504,6 +504,9 @@ namespace ev
 
 		//选择extent
 		{
+			//窗口大小改变后，要重新获取其extent
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_device.device, m_surface, &m_physical_device.capabilities);
+
 			if (m_physical_device.capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
 			{
 				choose_extent = m_physical_device.capabilities.currentExtent;
