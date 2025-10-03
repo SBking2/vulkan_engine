@@ -21,9 +21,18 @@
     <ClCompile Include="src\Application\Application.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vulkan\VulkanContext.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application\Application.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\VulkanContext.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Singleton\Singleton.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
