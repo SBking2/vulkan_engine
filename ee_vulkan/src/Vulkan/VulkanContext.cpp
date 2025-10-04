@@ -1,8 +1,10 @@
 #include "VulkanContext.h"
+#include <GLM/glm.hpp>
 #include <map>
 #include <iostream>
 #include <fstream>
 #include <set>
+#include <array>
 namespace ev
 {
 	/// <summary>
@@ -35,6 +37,7 @@ namespace ev
 		create_graphic_piple();
 		create_framebuffer();
 		create_command_pool();
+		create_vertex_buffer();
 		create_command_buffer();
 		create_semaphore();
 	}
@@ -44,6 +47,11 @@ namespace ev
 		vkDestroySemaphore(m_logical_device, m_img_avaliable_semaphore, nullptr);
 		vkDestroySemaphore(m_logical_device, m_render_finish_semaphore, nullptr);
 		vkDestroyFence(m_logical_device, m_inflight_fence, nullptr);
+
+		vkDestroyBuffer(m_logical_device, m_vertex_buffer, nullptr);
+		vkFreeMemory(m_logical_device, m_vertex_buffer_memory, nullptr);
+		vkDestroyBuffer(m_logical_device, m_index_buffer, nullptr);
+		vkFreeMemory(m_logical_device, m_index_buffer_memory, nullptr);
 
 		for (auto& view : m_swapchain_imgviews)
 		{
@@ -101,7 +109,7 @@ namespace ev
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_is_wanna_recreate_swapchain)
 		{
 			m_is_wanna_recreate_swapchain = false;
-			printf("recreate_swapchain!\n");
+			printf("**********************recreate_swapchain!\n");
 			recreate_swapchain();
 			return;
 		}
@@ -685,14 +693,32 @@ namespace ev
 			frag_shader_stage_create_info
 		};
 
+		//顶点绑定描述
+		VkVertexInputBindingDescription bind_descriptions = {};
+		bind_descriptions.binding = 0;
+		bind_descriptions.stride = sizeof(Vertex);
+		bind_descriptions.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		//顶点属性描述
+		std::array<VkVertexInputAttributeDescription, 2> attribute_descriptions{};
+		attribute_descriptions[0].binding = 0;
+		attribute_descriptions[0].location = 0;
+		attribute_descriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attribute_descriptions[0].offset = 0;
+
+		attribute_descriptions[1].binding = 0;
+		attribute_descriptions[1].location = 1;
+		attribute_descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attribute_descriptions[1].offset = offsetof(Vertex, color);
+
 		//1.顶点输入
 		//指定传给顶点着色器地顶点数据的格式
 		VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {};
 		vertex_input_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertex_input_state_create_info.vertexBindingDescriptionCount = 0;
-		vertex_input_state_create_info.pVertexBindingDescriptions = nullptr;
-		vertex_input_state_create_info.vertexAttributeDescriptionCount = 0;
-		vertex_input_state_create_info.pVertexAttributeDescriptions = nullptr;
+		vertex_input_state_create_info.vertexBindingDescriptionCount = 1;
+		vertex_input_state_create_info.pVertexBindingDescriptions = &bind_descriptions;
+		vertex_input_state_create_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size());
+		vertex_input_state_create_info.pVertexAttributeDescriptions = attribute_descriptions.data();
 
 		//2.输入装配
 		//定义了哪几种类型的图元
@@ -732,7 +758,7 @@ namespace ev
 		rasterization_create_info.rasterizerDiscardEnable = VK_FALSE;		//如果是True，则禁止一切片段输出到帧缓冲
 		rasterization_create_info.lineWidth = 1.0f;		//如果是True，则禁止一切片段输出到帧缓冲
 		rasterization_create_info.cullMode = VK_CULL_MODE_BACK_BIT;		//背面剔除
-		rasterization_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;		//顶点顺序？
+		rasterization_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;		//指定顺时针的顶点顺序为正面
 
 		rasterization_create_info.depthBiasEnable = VK_FALSE;	//是否将片段所处线段的斜率？放到深度值上？
 		rasterization_create_info.depthBiasConstantFactor = 0.0f;
@@ -763,13 +789,13 @@ namespace ev
 
 		//8.动态状态
 		VkDynamicState dynamicStates[] = {
-			//VK_DYNAMIC_STATE_VIEWPORT,		//视口变换
+			VK_DYNAMIC_STATE_VIEWPORT,		//视口变换
 			VK_DYNAMIC_STATE_LINE_WIDTH		//线宽
 		};
 
 		VkPipelineDynamicStateCreateInfo dynamic_create_info = {};
 		dynamic_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		dynamic_create_info.dynamicStateCount = sizeof(dynamicStates) / sizeof(VkDynamicState);
+		dynamic_create_info.dynamicStateCount = 0;	//sizeof(dynamicStates) / sizeof(VkDynamicState);	//暂时不开启
 		dynamic_create_info.pDynamicStates = dynamicStates;
 
 		//9.管线布局(uniform)
@@ -862,6 +888,72 @@ namespace ev
 		}
 	}
 
+	void VulkanContext::create_vertex_buffer()
+	{
+		vertices =
+		{
+			{{-0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+			{{0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
+			{{-0.5f, 0.5f}, {1.0f, 1.0f, 0.0f}},
+			{{ 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+		};
+
+		indices =
+		{
+			0, 1, 2, 1, 3, 2
+		};
+		
+		VkBuffer staging_buffer;
+		VkDeviceMemory staging_memory;
+
+		create_buffer(sizeof(Vertex) * vertices.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+			, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT	//CPU可见/CPU和GPU缓存保持一致
+			, staging_buffer, staging_memory
+		);
+
+		//往暂存缓冲中填充数据
+		void* data;
+		vkMapMemory(m_logical_device, staging_memory, 0, sizeof(Vertex) * vertices.size(), 0, &data);	//memory映射到cpu可以访问的内存中
+		memcpy(data, vertices.data(), sizeof(Vertex) * vertices.size());
+		vkUnmapMemory(m_logical_device, staging_memory);
+
+		create_buffer(sizeof(Vertex) * vertices.size()
+			, (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+			, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT		//表明这块内存是GPU内部
+			, m_vertex_buffer, m_vertex_buffer_memory
+			);
+
+		//将暂存buffer的数据传入到vertex buffer中
+		copy_buffer(staging_buffer, m_vertex_buffer, sizeof(Vertex) * vertices.size());
+
+		vkDestroyBuffer(m_logical_device, staging_buffer, nullptr);
+		vkFreeMemory(m_logical_device, staging_memory, nullptr);
+
+		//*********************************************** Index buffer *****************************************************
+
+		create_buffer(sizeof(uint16_t) * indices.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+			, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT	//CPU可见/CPU和GPU缓存保持一致
+			, staging_buffer, staging_memory
+		);
+
+		//往暂存缓冲中填充数据
+		vkMapMemory(m_logical_device, staging_memory, 0, sizeof(uint16_t) * indices.size(), 0, &data);	//memory映射到cpu可以访问的内存中
+		memcpy(data, indices.data(), sizeof(uint16_t) * indices.size());
+		vkUnmapMemory(m_logical_device, staging_memory);
+
+		create_buffer(sizeof(uint16_t) * indices.size()
+			, (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+			, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT		//表明这块内存是GPU内部
+			, m_index_buffer, m_index_buffer_memory
+		);
+
+		//将暂存buffer的数据传入到index buffer中
+		copy_buffer(staging_buffer, m_index_buffer, sizeof(uint16_t) * indices.size());
+
+		vkDestroyBuffer(m_logical_device, staging_buffer, nullptr);
+		vkFreeMemory(m_logical_device, staging_memory, nullptr);
+	}
+
 	void VulkanContext::create_command_buffer()
 	{
 		m_command_buffers.resize(m_swapchain_framebuffers.size());
@@ -898,7 +990,7 @@ namespace ev
 			renderpass_info.renderArea.offset = { 0, 0 };
 			renderpass_info.renderArea.extent = m_swapchain_extent;
 
-			VkClearValue clear_color = { 0.0f, 0.0f, 0.0f, 1.0f };
+			VkClearValue clear_color = { 0.1f, 0.1f, 0.1f, 1.0f };
 			renderpass_info.clearValueCount = 1;
 			renderpass_info.pClearValues = &clear_color;
 
@@ -908,8 +1000,13 @@ namespace ev
 			//绑定渲染管线
 			vkCmdBindPipeline(m_command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphic_pipeline);
 
+			VkBuffer vertex_buffers[] = { m_vertex_buffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(m_command_buffers[i], 0, 1, vertex_buffers, offsets);
+			vkCmdBindIndexBuffer(m_command_buffers[i], m_index_buffer, 0, VK_INDEX_TYPE_UINT16);
+
 			//绘制
-			vkCmdDraw(m_command_buffers[i], 3, 1, 0, 0);
+			vkCmdDrawIndexed(m_command_buffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
 			//结束renderpass
 			vkCmdEndRenderPass(m_command_buffers[i]);
@@ -946,6 +1043,17 @@ namespace ev
 	}
 
 	#pragma endregion
+
+	uint32_t VulkanContext::find_memory_type(uint32_t filter, VkMemoryPropertyFlags properties)
+	{
+		VkPhysicalDeviceMemoryProperties mem_properties;
+		vkGetPhysicalDeviceMemoryProperties(m_physical_device.device, &mem_properties);
+		for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
+		{
+			if ((filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
+				return i;
+		}
+	}
 
 	/// <summary>
 	/// 检查物理显卡是否合格
@@ -1063,6 +1171,39 @@ namespace ev
 		return true;
 	}
 
+	void VulkanContext::create_buffer(VkDeviceSize size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlags properties
+		, VkBuffer& buffer, VkDeviceMemory& memory)
+	{
+		VkBufferCreateInfo buffer_create_info = {};
+		buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		buffer_create_info.size = size;
+		buffer_create_info.usage = usage;
+		buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		if (vkCreateBuffer(m_logical_device, &buffer_create_info, nullptr, &buffer) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to create buffer!");
+		}
+
+		//内存
+		VkMemoryRequirements mem_requirment;
+		vkGetBufferMemoryRequirements(m_logical_device, buffer, &mem_requirment);
+
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_requirment.size;
+		alloc_info.memoryTypeIndex = find_memory_type(mem_requirment.memoryTypeBits
+			, properties
+			);
+		
+		if (vkAllocateMemory(m_logical_device, &alloc_info, nullptr, &memory) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to allocate memory!");
+		}
+
+		vkBindBufferMemory(m_logical_device, buffer, memory, 0);
+	}
+
 	void VulkanContext::read_shader(const std::string& path, std::vector<char>& source)
 	{
 		std::ifstream file(path, std::ios::ate | std::ios::binary);		//ate模式是开始时处于文件尾部
@@ -1095,5 +1236,40 @@ namespace ev
 		}
 
 		return shader_module;
+	}
+
+	//使用命令池传输数据
+	void VulkanContext::copy_buffer(VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size)
+	{
+		VkCommandBufferAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		alloc_info.commandPool = m_command_pool;
+		alloc_info.commandBufferCount = 1;
+
+		VkCommandBuffer command_buffer;
+		vkAllocateCommandBuffers(m_logical_device, &alloc_info, &command_buffer);
+
+		//开始记录指令
+		VkCommandBufferBeginInfo begin_info = {};
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		vkBeginCommandBuffer(command_buffer, &begin_info);
+		VkBufferCopy copy_region = {};
+		copy_region.srcOffset = 0;
+		copy_region.dstOffset = 0;
+		copy_region.size = size;
+		vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copy_region);
+		vkEndCommandBuffer(command_buffer);
+
+		//提交指令
+		VkSubmitInfo submit_info = {};
+		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit_info.commandBufferCount = 1;
+		submit_info.pCommandBuffers = &command_buffer;
+
+		vkQueueSubmit(m_graphic_queue, 1, &submit_info, VK_NULL_HANDLE);
+		vkQueueWaitIdle(m_graphic_queue);
+
+		vkFreeCommandBuffers(m_logical_device, m_command_pool, 1, &command_buffer);
 	}
 }

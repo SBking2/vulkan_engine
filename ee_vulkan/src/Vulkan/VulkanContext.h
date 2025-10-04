@@ -4,7 +4,7 @@
 #define GLFW_INCLUED_VULKAN
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
-
+#include <GLM/glm.hpp>
 #include <vector>
 #include <string>
 
@@ -29,6 +29,7 @@ namespace ev
 		void create_graphic_piple();
 		void create_framebuffer();
 		void create_command_pool();
+		void create_vertex_buffer();
 		void create_command_buffer();
 		void create_semaphore();
 	private:
@@ -39,8 +40,12 @@ namespace ev
 			, VkSurfaceCapabilitiesKHR& capabilities
 			, std::vector<VkSurfaceFormatKHR>& formats, std::vector<VkPresentModeKHR>& modes
 		);
+		void create_buffer(VkDeviceSize size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlags properties
+			, VkBuffer& buffer, VkDeviceMemory& memory);
 		void read_shader(const std::string& path, std::vector<char>& source);
 		VkShaderModule create_shader_module(const std::vector<char>& source);
+		uint32_t find_memory_type(uint32_t filter, VkMemoryPropertyFlags properties);
+		void copy_buffer(VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
 	private:
 		GLFWwindow* m_window;
 		bool m_is_wanna_recreate_swapchain;
@@ -59,6 +64,15 @@ namespace ev
 			std::vector<VkSurfaceFormatKHR> formats;
 			std::vector<VkPresentModeKHR> present_modes;
 		};
+
+		struct Vertex
+		{
+			glm::vec2 pos;
+			glm::vec3 color;
+		};
+
+		std::vector<Vertex> vertices;
+		std::vector<uint16_t> indices;
 
 		VkInstance m_vk_instace;
 
@@ -87,6 +101,11 @@ namespace ev
 		std::vector<VkFramebuffer> m_swapchain_framebuffers;
 
 		VkCommandPool m_command_pool;
+
+		VkBuffer m_vertex_buffer;
+		VkDeviceMemory m_vertex_buffer_memory;
+		VkBuffer m_index_buffer;
+		VkDeviceMemory m_index_buffer_memory;
 
 		std::vector<VkCommandBuffer> m_command_buffers;
 
